@@ -1,0 +1,348 @@
+package rs.ac.bg.etf.pp1;
+
+import java_cup.runtime.*;
+import org.apache.log4j.*;
+import rs.ac.bg.etf.pp1.ast.*;
+
+parser code {:
+
+	Logger log = Logger.getLogger(getClass());
+
+	public void report_fatal_error(String message, Object info) throws java.lang.Exception {
+      done_parsing();
+      report_error(message, info);
+    }
+  
+    public void syntax_error(Symbol cur_token) {
+        report_error("\nSintaksna greska", cur_token);
+    }
+  
+    public void unrecovered_syntax_error(Symbol cur_token) throws java.lang.Exception {
+        report_fatal_error("Fatalna greska, parsiranje se ne moze nastaviti", cur_token);
+    }
+
+    public void report_error(String message, Object info) {
+    	StringBuilder msg = new StringBuilder(message); 
+    	if (info instanceof Symbol)
+            msg.append (" na liniji ").append(((Symbol)info).left);
+        log.error(msg.toString());
+    }
+    
+:}
+
+
+
+scan with {:
+	Symbol s = this.getScanner().next_token();
+	if (s != null && s.value != null) 
+		log.info(s.toString() + " " + s.value.toString());
+	return s;
+:}
+
+terminal PROGRAM, CONST, ENUM, CLASS, ABSTRACT, EXTENDS, VOID;
+terminal IF, ELSE, BREAK, CONTINUE, RETURN, READ, PRINT, SWITCH, CASE, FOR, NEW, LENGTH;
+terminal PLUS, MINUS, MUL, DIV, MOD;
+terminal EQ, NEQ, GT, GTE, LT, LTE;
+terminal AND, OR;
+terminal EQUAL, INC, DEC;
+terminal QUESTION, DOTDOT, DOTCOMMA, COMMA, DOT;
+terminal LPARENT, RPARENT, LSQUARE, RSQUARE, LVIGGLE, RVIGGLE;
+terminal Integer NUMBER;
+terminal Character CHAR;
+terminal Boolean BOOL;
+terminal String IDENT;
+
+nonterminal rs.etf.pp1.symboltable.concepts.Obj ProgramName, Program, MethodTypeName, MethodDecl, AbstractMethodDecl, ClassName, EnumName, Designator, Field;
+
+nonterminal rs.etf.pp1.symboltable.concepts.Struct Type, RetType, Expr, ExprOr, ExprAnd, ExprRel, ExprAdd, Term, Factor, ArrExpr, Const;
+
+// Structural nonterminals for CodeGen hooks
+nonterminal IfCondition, ElseStart;
+nonterminal ForStart, ForCondition, ForStep;
+nonterminal SwitchStart, CaseStart;
+nonterminal TernaryStart, TernaryElse;
+nonterminal AndMarker, OrMarker, MethodCallMarker, ArrayMarker;
+
+nonterminal GlobalDeclList, GlobalDecl, ConstDecl, ConstList, VarDecl, VarList, Arr, EnumDecl, EnumList, EnumVal;
+nonterminal ClassDecl, Extend, ClassVar, ClassMethod, AbstractClassDecl, AbstractClassMethodList;
+nonterminal FormParamList, MethodDeclList, VarDeclList, StatementList, Statement, RetExpr, CaseList, PrintNum;
+nonterminal ForDesignator, ForCond, DesignatorStatement, DesignateOp, CallParams, Relation, CallParamList, FormParams, MethodOrAbstract, AbstractClassMethods, MethodList;
+
+precedence left ELSE;
+
+Program ::= (Program) PROGRAM ProgramName GlobalDeclList LVIGGLE MethodDeclList RVIGGLE;
+
+ProgramName ::= (ProgramName) IDENT:name;
+
+GlobalDeclList ::= (GlobalDeclarations) GlobalDeclList GlobalDecl
+				|
+				(NoGlobalDeclarations) /* epsilon */;
+				
+GlobalDecl ::= (GlobalConstDecl) ConstDecl
+			|
+			(GlobalVarDecl) VarDecl
+			|
+			(GlobalEnumDecl) EnumDecl
+			|
+			(GlobalClassDecl) ClassDecl
+			|
+			(GlobalAbstractClassDecl) AbstractClassDecl;
+			
+ConstDecl ::= (ConstDecl) CONST Type:constType ConstList DOTCOMMA;
+
+Type ::= (Type) IDENT:typeName;
+
+ConstList ::= (SingleConst) IDENT:constName EQUAL Const
+			|
+			(MultipleConsts) ConstList COMMA IDENT:constName EQUAL Const;
+			
+Const ::= (ConstNumber) NUMBER:num
+	   |
+	   (ConstChar) CHAR:chr
+	   |
+	   (ConstBool) BOOL:bool;			
+
+
+VarDecl ::= (VarDecl) Type:varType VarList DOTCOMMA;
+
+VarList ::= (SingleVar) IDENT:varName Arr
+		 |
+		 (MultipleVars) VarList COMMA IDENT:varName Arr;
+		 
+Arr ::= (IsArray) LSQUARE RSQUARE
+	 |
+	 (IsNotArray) /* epsilon */;
+
+EnumDecl ::= (EnumDecl) ENUM EnumName LVIGGLE EnumList RVIGGLE;
+
+EnumName ::= (EnumName) IDENT:name;
+
+EnumList ::= (SingleEnumElem) IDENT:enumElem EnumVal
+		  |
+		  (MultipleEnumElems) EnumList COMMA IDENT:enumElem EnumVal;
+
+EnumVal ::= (EnumValue) EQUAL NUMBER:enumValue
+		 |
+		 (NoEnumValue) /* epsilon */;
+		 
+ClassDecl ::= (ClassDecl) CLASS ClassName Extend LVIGGLE VarDeclList ClassMethod RVIGGLE;
+
+ClassName ::= (ClassName) IDENT:name;
+
+Extend ::= (Extends) EXTENDS Type:typeName
+		|
+		(DoesNotExtend) /* epsilon */;
+		  
+ClassMethod ::= (HasMethods) LVIGGLE MethodDeclList RVIGGLE
+			 |
+			 (NoMethods) /* epsilon */;
+
+AbstractClassDecl ::= (AbstractClassDecl) ABSTRACT CLASS ClassName Extend LVIGGLE VarDeclList AbstractClassMethods RVIGGLE;
+
+AbstractClassMethods ::= (HasMethodsAbstract) LVIGGLE AbstractClassMethodList RVIGGLE
+					  |
+  					  (NoMethodsAbstract) /* epsilon */;	 
+
+AbstractClassMethodList ::= (MethodsAbstractDecl) AbstractClassMethodList MethodOrAbstract
+						 |
+						 (NoMethodsAbstractDecl) /* epsilon */;
+						 
+MethodOrAbstract ::= (IsNormalMethod) MethodDecl
+				   |
+				   (IsAbstractMethod) AbstractMethodDecl DOTCOMMA;
+
+AbstractMethodDecl ::= (AbstractMethodDecl) ABSTRACT MethodTypeName LPARENT FormParams RPARENT;
+
+MethodTypeName ::= (MethodTypeName) RetType IDENT:methodName;
+
+RetType ::= (ReturnType) Type
+		 |
+		 (NoReturn) VOID;
+
+FormParams ::= (HasFormParams) FormParamList
+			|
+			(NoFormParams) /* epsilon */;
+
+
+FormParamList ::= (SingularParam) Type IDENT:paramName Arr
+			   |
+			   (MultipleParams) FormParamList COMMA Type IDENT:paramName Arr;
+
+MethodDeclList ::= (HasMethodsDeclaration) MethodList
+				|
+				(NoMethodsDecleuration) /* epsilon */;
+				
+MethodList ::= (MultipleMethods) MethodList MethodDecl
+			|
+			(SingleMEthod) MethodDecl;
+
+MethodDecl ::= (MethodDeclaration) MethodTypeName LPARENT FormParams RPARENT VarDeclList LVIGGLE StatementList RVIGGLE;
+
+VarDeclList ::= (HasVarsDecl) VarDeclList VarDecl
+			 |
+			 (NoVars) /* epsilon */;
+
+StatementList ::= (HasStatements) StatementList Statement
+			   |
+			   (NoStatements) /* epsilon */;
+
+Statement ::= (Assigment) DesignatorStatement DOTCOMMA
+		   |
+		   (If) IfCondition Statement
+		   |
+		   (IfElse) IfCondition Statement ElseStart Statement
+		   |
+		   (Break) BREAK DOTCOMMA
+		   |
+		   (Continue) CONTINUE DOTCOMMA
+		   |
+		   (Return) RETURN RetExpr DOTCOMMA
+		   |
+		   (Read) READ LPARENT Designator RPARENT DOTCOMMA
+		   |
+		   (Print) PRINT LPARENT Expr PrintNum RPARENT DOTCOMMA
+		   |
+		   (Switch) SwitchStart LVIGGLE CaseList RVIGGLE
+		   |
+		   (For) ForStart ForCondition ForStep Statement
+		   |
+		   (InnerStatement) LVIGGLE StatementList RVIGGLE;
+	
+IfCondition ::= (IfCondition) IF LPARENT Expr RPARENT;
+
+ElseStart ::= (ElseStart) ELSE;
+		   
+RetExpr ::= (ReturnExpr) Expr
+		 |
+		 (NoReturnExpr) /* epsilon */;
+		   
+SwitchStart ::= (SwitchStart) SWITCH LPARENT Expr RPARENT;
+		   
+CaseList ::= (HasCases) CaseList CaseStart StatementList
+		  |
+		  (NoCase) /* epsilon */;
+		  
+CaseStart ::= (CaseStart) CASE NUMBER:num DOTDOT;
+
+PrintNum ::= (HasPrintNum) COMMA NUMBER:printNum
+		  |
+		  (NoPrintNum) /* epsilon */;	 
+		  
+ForStart ::= (ForStart) FOR LPARENT ForDesignator DOTCOMMA;
+
+ForCondition ::= (ForCondition) ForCond DOTCOMMA;
+
+ForStep ::= (ForStep) ForDesignator RPARENT;
+
+ForDesignator ::= (HasForDesignator) DesignatorStatement
+			   |
+			   (NoDesignator) /* epsilon */;
+			   
+ForCond ::= (HasForCondition) Expr
+		 |
+		 (NoCondition) /* epsilon */;
+		 
+DesignatorStatement ::= (DesignatorStatement) Designator:name DesignateOp;
+
+DesignateOp ::= (Assign) EQUAL Expr
+			 |
+			 (MethodCall) MethodCallMarker LPARENT CallParams RPARENT
+			 |
+			 (Inc) INC
+			 |
+			 (Dec) DEC;
+			 
+CallParams ::= (HasCallParams) CallParamList
+			|
+			(NoCallParams) /* epsilon */;
+
+CallParamList ::= (SingleParameter) Expr:paramValue
+			   |
+			   (MultipleParameters) CallParamList COMMA Expr:paramValue;
+		
+Relation ::= (Equal) EQ
+		  |
+		  (NotEqual) NEQ
+		  |
+		  (Grater) GT
+		  |
+		  (GraterEqual) GTE
+		  |
+		  (Less) LT
+		  |
+		  (LessEqual) LTE;		 
+		 
+Expr ::= (Ternary) ExprOr TernaryStart ExprAdd TernaryElse ExprAdd
+      | 
+      (OrExpr) ExprOr;
+
+TernaryStart ::= (TernaryStart) QUESTION;
+
+TernaryElse ::= (TernaryElse) DOTDOT;
+
+ExprOr ::= (LogicOr) ExprOr OrMarker ExprAnd
+        | 
+        (OrTerm) ExprAnd;
+
+OrMarker ::= (OrMarker) OR;
+
+ExprAnd ::= (LogicAnd) ExprAnd AndMarker ExprRel
+         | 
+         (AndTerm) ExprRel;
+         
+AndMarker ::= (AndMarker) AND;
+
+ExprRel ::= (RelationExpr) ExprAdd Relation ExprAdd
+      	 | 
+      	 (RelTerm) ExprAdd;
+
+ExprAdd ::= (Addition) ExprAdd PLUS Term
+         | 
+         (Subtraction) ExprAdd MINUS Term
+         | 
+         (Negative) MINUS Term
+         | 
+         (ExprTerm) Term;
+	  
+Term ::= (Multiplication) Term MUL Factor
+	  |
+	  (Division) Term DIV Factor
+	  |
+	  (Modality) Term MOD Factor
+	  |
+	  (TermFactor) Factor;
+
+Factor ::= (FactorDesignator) Designator 
+		|
+		(MethodCallFactor) Designator MethodCallMarker LPARENT CallParams RPARENT
+		|
+		(NumberFactor) NUMBER:value
+		|
+		(CharacterFactor) CHAR:value
+		|
+		(BooleanFactor) BOOL:value
+		|
+		(Allocation) NEW Type ArrExpr
+		|
+		(Expression) LPARENT Expr RPARENT;
+	
+MethodCallMarker ::= (MethodCallMarker) /* epsilon */;
+		
+ArrExpr ::= (IsArrayExpr) LSQUARE Expr RSQUARE
+		 |
+		 (IsNotArrayExpr) /* epsilon */;	
+		
+Designator ::= (SimpleDesignator) IDENT:desigName
+		 	|
+		 	(FieldDesignator) Designator DOT Field
+		 	|
+		 	(ArrayDesignator) Designator ArrayMarker Expr RSQUARE;
+	
+ArrayMarker ::= (ArrayMarker) LSQUARE;
+		
+Field ::= (FieldAcces) IDENT:fieldName
+	   |
+	   (Len) LENGTH;		
+
+	  
+		

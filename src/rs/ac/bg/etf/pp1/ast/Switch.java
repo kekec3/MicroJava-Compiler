@@ -1,0 +1,78 @@
+// generated with ast extension for cup
+// version 0.8
+// 10/2/2026 19:58:50
+
+
+package rs.ac.bg.etf.pp1.ast;
+
+public class Switch extends Statement {
+
+    private SwitchStart SwitchStart;
+    private CaseList CaseList;
+
+    public Switch (SwitchStart SwitchStart, CaseList CaseList) {
+        this.SwitchStart=SwitchStart;
+        if(SwitchStart!=null) SwitchStart.setParent(this);
+        this.CaseList=CaseList;
+        if(CaseList!=null) CaseList.setParent(this);
+    }
+
+    public SwitchStart getSwitchStart() {
+        return SwitchStart;
+    }
+
+    public void setSwitchStart(SwitchStart SwitchStart) {
+        this.SwitchStart=SwitchStart;
+    }
+
+    public CaseList getCaseList() {
+        return CaseList;
+    }
+
+    public void setCaseList(CaseList CaseList) {
+        this.CaseList=CaseList;
+    }
+
+    public void accept(Visitor visitor) {
+        visitor.visit(this);
+    }
+
+    public void childrenAccept(Visitor visitor) {
+        if(SwitchStart!=null) SwitchStart.accept(visitor);
+        if(CaseList!=null) CaseList.accept(visitor);
+    }
+
+    public void traverseTopDown(Visitor visitor) {
+        accept(visitor);
+        if(SwitchStart!=null) SwitchStart.traverseTopDown(visitor);
+        if(CaseList!=null) CaseList.traverseTopDown(visitor);
+    }
+
+    public void traverseBottomUp(Visitor visitor) {
+        if(SwitchStart!=null) SwitchStart.traverseBottomUp(visitor);
+        if(CaseList!=null) CaseList.traverseBottomUp(visitor);
+        accept(visitor);
+    }
+
+    public String toString(String tab) {
+        StringBuffer buffer=new StringBuffer();
+        buffer.append(tab);
+        buffer.append("Switch(\n");
+
+        if(SwitchStart!=null)
+            buffer.append(SwitchStart.toString("  "+tab));
+        else
+            buffer.append(tab+"  null");
+        buffer.append("\n");
+
+        if(CaseList!=null)
+            buffer.append(CaseList.toString("  "+tab));
+        else
+            buffer.append(tab+"  null");
+        buffer.append("\n");
+
+        buffer.append(tab);
+        buffer.append(") [Switch]");
+        return buffer.toString();
+    }
+}

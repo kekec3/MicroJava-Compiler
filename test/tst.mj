@@ -1,0 +1,25 @@
+//Test 303
+
+program tst
+
+class AC
+{
+	 int a;
+}
+
+class CB
+{
+	 AC ac;
+}
+
+
+CB cb;
+{
+		
+	void main()
+	{	
+		cb.ac.a = 5;
+		print(cb.ac.a);
+	}
+}
+
